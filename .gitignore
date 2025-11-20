@@ -71,3 +71,4 @@ docker-data/
 ########################
 *.log
 logs/
+backend/serviceAccountKey.json
