@@ -72,3 +72,5 @@ docker-data/
 *.log
 logs/
 backend/serviceAccountKey.json
+backend/.env
+frontend/.env
