@@ -1,0 +1,73 @@
+### ---- GLOBAL GITIGNORE FOR FULL PROJECT ----
+
+########################
+# OS & EDITOR FILES
+########################
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+########################
+# ENVIRONMENT
+########################
+.env
+*.env
+
+########################
+# PYTHON BACKEND
+########################
+
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# Python tooling
+pytest_cache/
+.coverage
+*.sqlite3
+*.db
+
+# Generated DOCX/PPTX
+*.docx
+*.pptx
+
+########################
+# NODE FRONTEND
+########################
+
+# Node modules
+node_modules/
+
+# Vite / React build output
+dist/
+build/
+
+# Cache
+.cache/
+.eslintcache
+*.log
+
+# Generated lock files (optional)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+########################
+# DOCKER & COMPOSE
+########################
+docker-data/
+*.pid
+
+########################
+# MISC
+########################
+*.log
+logs/

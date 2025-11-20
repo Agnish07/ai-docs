@@ -1,0 +1,23 @@
+/* src/index.css */
+
+/* Fonts: serif for logo, sans for UI */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@400;700;900&display=swap');
+/* src/index.css (or wherever you import global CSS) */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Poppins:wght@300;400;600&display=swap');
+
+:root{
+  --primary: #DF6C4F;
+  --accent:  #D14836;
+  --white:   #ffffff;
+}
+
+/* small helpers if you want */
+.font-oswald { font-family: "Oswald", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+.font-poppins { font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+
+@import "tailwindcss";
+
+/* src/index.css */
+main { min-height: calc(100vh - var(--nav-height, 96px)); }
+
+
