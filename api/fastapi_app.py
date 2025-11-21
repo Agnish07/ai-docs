@@ -1,13 +1,24 @@
 # api/fastapi_app.py
-# Vercel will treat this file as a Python serverless function and expose `app`.
-# It imports your FastAPI app from backend.app.main
+# Correct handler for FastAPI running on Vercel Python serverless
 
-import os
-# ensure backend package is on path if necessary
 import sys
 from pathlib import Path
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(REPO_ROOT / "backend"))
 
-# import app from your backend
-from app.main import app  # make sure backend/app/main.py defines `app`
+# Add backend to Python path
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_PATH = REPO_ROOT / "backend"
+sys.path.append(str(BACKEND_PATH))
+
+# Import FastAPI app
+from app.main import app
+
+# ASGI adapter for Vercel serverless functions
+# Vercel requires this wrapper to execute FastAPI correctly.
+try:
+    from mangum import Mangum
+except ImportError:
+    raise ImportError(
+        "Mangum must be installed. Add `mangum` to your requirements.txt"
+    )
+
+handler = Mangum(app)
