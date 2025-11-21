@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import api from "../api";
-import { Bell } from 'lucide-react';
+import { Bell, Search, Waves } from "lucide-react";
+import logo from "../assets/logo.svg";
 
 export default function Navbar({ onCreateClick }) {
   const navigate = useNavigate();
@@ -13,15 +14,30 @@ export default function Navbar({ onCreateClick }) {
   const [results, setResults] = useState([]);
   const [openSearch, setOpenSearch] = useState(false);
   const [openUserMenu, setOpenUserMenu] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   const containerRef = useRef(null);
   const avatarRef = useRef(null);
   const userMenuRef = useRef(null);
   const debounceRef = useRef(null);
+  const searchControllerRef = useRef(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
+  }, []);
+
+  // cleanup debounce and abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (searchControllerRef.current) {
+        try {
+          searchControllerRef.current.abort();
+        } catch (e) {}
+        searchControllerRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -53,22 +69,82 @@ export default function Navbar({ onCreateClick }) {
   }, []);
 
   async function doSearch(q) {
-    if (!q.trim()) {
-      setResults([]);
-      setOpenSearch(false);
-      return;
-    }
-    try {
-      const res = await api.get("/projects", { params: { q } });
-      const data = res.data || res;
-      const list = Array.isArray(data) ? data : data.projects || data.items || [];
-      setResults(list.slice(0, 10));
-      setOpenSearch(true);
-    } catch {
-      setResults([]);
-      setOpenSearch(false);
-    }
+  const trimmed = (q || "").trim();
+
+  // minimum length (helps avoid backend returning everything for empty q)
+  if (!trimmed || trimmed.length < 2) {
+    setResults([]);
+    setOpenSearch(false);
+    setSearching(false);
+    return;
   }
+
+  // abort previous controller if present
+  if (searchControllerRef.current) {
+    try { searchControllerRef.current.abort(); } catch (e) {}
+    searchControllerRef.current = null;
+  }
+  const controller = new AbortController();
+  searchControllerRef.current = controller;
+  setSearching(true);
+
+  try {
+    // log what we send
+    console.debug("[Search] sending request:", { q: trimmed });
+
+    const res = await api.get("/projects", {
+      params: { q: trimmed }, // <-- if your backend expects `search` change here
+      signal: controller.signal,
+    });
+
+    console.debug("[Search] raw response:", res);
+
+    const data = res?.data ?? res;
+    // normalize list of results
+    let list = Array.isArray(data) ? data : data.projects ?? data.items ?? [];
+
+    // SAFETY: if backend returned all items (e.g. q ignored), filter client-side
+    // We'll consider it "all items" if backend returned >0 items and none of them
+    // matched the query (indicating server didn't filter).
+    const ci = (str) => (str || "").toString().toLowerCase();
+    const qLower = trimmed.toLowerCase();
+
+    const anyServerMatched = list.some(
+      (p) =>
+        ci(p.title).includes(qLower) ||
+        ci(p.main_prompt).includes(qLower) ||
+        (p.tags && Array.isArray(p.tags) && p.tags.join(" ").toLowerCase().includes(qLower))
+    );
+
+    if (!anyServerMatched && list.length > 0) {
+      console.debug("[Search] backend likely returned unfiltered data — applying client-side filter");
+      list = list.filter(
+        (p) =>
+          ci(p.title).includes(qLower) ||
+          ci(p.main_prompt).includes(qLower) ||
+          (p.tags && Array.isArray(p.tags) && p.tags.join(" ").toLowerCase().includes(qLower))
+      );
+    }
+
+    setResults(list.slice(0, 10));
+    setOpenSearch(true);
+  } catch (err) {
+    const isAbort =
+      err?.name === "AbortError" ||
+      err?.code === "ERR_CANCELED" ||
+      err?.message?.toLowerCase()?.includes("canceled") ||
+      err?.message?.toLowerCase()?.includes("abort");
+    if (!isAbort) {
+      console.error("[Search] error:", err);
+      setResults([]);
+      setOpenSearch(false);
+    }
+  } finally {
+    setSearching(false);
+    if (searchControllerRef.current === controller) searchControllerRef.current = null;
+  }
+}
+
 
   function onSearchChange(e) {
     const v = e.target.value;
@@ -234,6 +310,35 @@ export default function Navbar({ onCreateClick }) {
         .focus-ring { position:absolute; inset:-5px; border-radius:999px; pointer-events:none; opacity:0; transform:scale(.98); transition:all .16s ease; }
         .search-pill:focus-within .focus-ring { opacity:1; transform:scale(1); box-shadow: 0 0 0 5px rgba(255,90,90,0.06); }
 
+        /* search results */
+        .search-list {
+          position: absolute;
+          top: calc(100% + 12px);
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(880px, calc(100% - 2rem));
+          max-width: 900px;
+          background: #ffffff;
+          color: #2b2b2b;
+          border-radius: 10px;
+          overflow: hidden;
+          box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+          z-index: 2000;
+          border: 1px solid rgba(0,0,0,0.06);
+        }
+        .search-item {
+          padding: 0.6rem 0.9rem;
+          border-bottom: 1px solid rgba(0,0,0,0.04);
+          cursor: pointer;
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item .title { font-weight: 700; }
+        .search-item .sub { font-size: 0.86rem; color: #6b6b6b; margin-top: 4px; }
+        .search-item:focus, .search-item:hover {
+          background: rgba(255,90,90,0.04);
+          outline: none;
+        }
+
         /* small responsive adjustments: reduce max-width subtraction on narrow screens to avoid clipping brand */
         @media (max-width: 1100px) {
           .nav-inner { padding-left: 1rem; padding-right: 1rem; }
@@ -264,8 +369,17 @@ export default function Navbar({ onCreateClick }) {
             onClick={() => navigate("/dashboard")}
             role="button"
             tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate("/dashboard");
+              }
+            }}
           >
-            <div className="brand-logo" aria-hidden />
+            <div className="brand" aria-hidden>
+              {/* you can swap Waves with an <img src={logo} /> if you want */}
+              <Waves className="w-9 h-9" />
+            </div>
             <div className="brand-title">Ocean</div>
           </div>
 
@@ -278,28 +392,42 @@ export default function Navbar({ onCreateClick }) {
                   role="search"
                   aria-label="Search projects"
                 >
-                  <div className="search-icon" aria-hidden>🔍</div>
+                  <div className="search-icon" aria-hidden>
+                    <Search />
+                  </div>
                   <input
                     className="search-input"
                     value={query}
                     onChange={onSearchChange}
                     placeholder="Search projects..."
-                    onFocus={() => results.length && setOpenSearch(true)}
+                    onFocus={() => setOpenSearch(true)}
                     aria-label="Search projects"
                   />
                   <div className="focus-ring" aria-hidden />
                 </div>
 
                 {openSearch && (
-                  <div className="search-list" role="listbox" aria-label="Search results">
-                    {results.length === 0 ? (
+                  <div
+                    className="search-list"
+                    role="listbox"
+                    aria-label="Search results"
+                  >
+                    {searching && results.length === 0 ? (
+                      <div className="search-item">Searching…</div>
+                    ) : results.length === 0 ? (
                       <div className="search-item">No results</div>
                     ) : (
                       results.map((p) => (
                         <div
-                          key={p.id || p.title}
+                          key={p.id ?? p.title}
                           className="search-item"
                           onClick={() => selectProject(p)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              selectProject(p);
+                            }
+                          }}
                           role="option"
                           tabIndex={0}
                         >
@@ -318,7 +446,7 @@ export default function Navbar({ onCreateClick }) {
           <div className="actions">
             {user && (
               <button
-                className="btn-create"
+                className="btn-create cursor-pointer"
                 onClick={handleCreate}
                 aria-label="Create project"
               >
@@ -327,12 +455,12 @@ export default function Navbar({ onCreateClick }) {
             )}
 
             <button
-              className="ghost-btn"
+              className="ghost-btn cursor-pointer"
               title="Notifications"
               onClick={() => alert("Notifications (placeholder)")}
               aria-label="Notifications"
             >
-              <Bell/>
+              <Bell />
             </button>
 
             <div style={{ position: "relative" }}>
@@ -340,7 +468,7 @@ export default function Navbar({ onCreateClick }) {
                 <>
                   <div
                     ref={avatarRef}
-                    className="avatar"
+                    className="avatar cursor-pointer"
                     onClick={() => setOpenUserMenu((s) => !s)}
                     aria-haspopup="true"
                     aria-expanded={openUserMenu}

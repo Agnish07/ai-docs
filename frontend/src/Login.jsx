@@ -256,18 +256,7 @@ export default function Login() {
 
           {/* Optional — test the backend protected endpoint */}
           <div className="api-area">
-            <div className="api-controls">
-              <button
-                onClick={callGenerateTest}
-                className="btn-primary"
-                style={{ padding: "10px 16px", width: "220px" }}
-              >
-                Call Protected API
-              </button>
-              <div style={{ flex: 1 }} className="muted">
-                (Use this to test your backend; response will appear below)
-              </div>
-            </div>
+            
 
             {resp && <pre className="api-pre">{resp}</pre>}
           </div>

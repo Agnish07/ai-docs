@@ -4,6 +4,8 @@ import api from "../api";
 import CreateProjectModal from "../components/CreateProjectModal";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../firebase";
+import logo from '../assets/logo.svg'
+import { Shell, WavesIcon } from "lucide-react";
 
 // local logo image you provided (used in header)
 const LOGO_PATH = "/mnt/data/7bdc7eda-19fb-4ee1-ab9a-1ef6157aed88.png";
@@ -289,7 +291,10 @@ export default function Dashboard() {
         <div className="dashboard-inner">
           <div className="header">
             <div className="header-left">
-              <div className="brand-badge" aria-hidden />
+              <div className="" aria-hidden>
+                 {/* <img src={logo} alt="" /> */}
+                 <WavesIcon className="w-10 h-10 text-cyan-500"/>
+               </div>
               <div className="header-title">
                 <h2>Projects</h2>
                 <div className="header-sub">Create and manage documents</div>

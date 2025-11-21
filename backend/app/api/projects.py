@@ -1,8 +1,10 @@
 # backend/app/api/projects.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional, Tuple
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Tuple
+from sqlalchemy import or_
 import io
 
 from app.api.deps import get_current_user, get_db
@@ -35,21 +37,35 @@ def get_or_create_user(db: Session, firebase_user: dict) -> User:
 
 @router.get("", response_model=List[ProjectOut])
 def list_projects(
+    q: Optional[str] = Query(None, description="Search query (case-insensitive)"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of projects to return"),
     db: Session = Depends(get_db),
     firebase_user: dict = Depends(get_current_user),
 ):
     """
     List projects owned by the current user.
+    Supports optional case-insensitive search across title and main_prompt using `q`.
     Projects are ordered by creation date (newest first).
     Each project's .items list is sorted by Item.order for stable outline ordering.
     """
     user = get_or_create_user(db, firebase_user)
-    projects = (
-        db.query(Project)
-        .filter(Project.user_id == user.id)
-        .order_by(Project.created_at.desc())
-        .all()
-    )
+
+    query = db.query(Project).filter(Project.user_id == user.id)
+
+    # apply search filter if q provided and non-empty after trimming
+    if q:
+        q_trim = q.strip()
+        if q_trim:
+            q_like = f"%{q_trim}%"
+            # use ilike for case-insensitive match (Postgres). If using another DB adapt accordingly.
+            query = query.filter(
+                or_(
+                    Project.title.ilike(q_like),
+                    Project.main_prompt.ilike(q_like)
+                )
+            )
+
+    projects = query.order_by(Project.created_at.desc()).limit(limit).all()
 
     # ensure items for each project are stable-ordered by Item.order (in-memory)
     for proj in projects:
