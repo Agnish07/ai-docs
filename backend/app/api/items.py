@@ -12,7 +12,7 @@ from app.core.formatters import parse_llm_output
 
 from app.models.models import User, Project, Item  # concrete models from your project
 
-router = APIRouter(prefix="/api/v1/projects", tags=["items"])
+router = APIRouter(prefix="/projects", tags=["projects"])
 
 
 def get_or_create_user(db: Session, firebase_user: dict):

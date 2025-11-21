@@ -11,7 +11,8 @@ from app.api.deps import get_current_user, get_db
 from app.models.models import User, Project, Item
 from app.schemas.project import ProjectCreate, ProjectOut
 
-router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
+router = APIRouter(prefix="/projects", tags=["projects"])
+
 
 
 def get_or_create_user(db: Session, firebase_user: dict) -> User:

@@ -9,7 +9,8 @@ from app.api.items import get_project_for_user, get_or_create_user  # or re-impl
 from app.core.export_docx import create_docx_from_structure
 from app.core.export_pptx import create_pptx_from_structure
 
-router = APIRouter(prefix="/api/v1/projects", tags=["export"])
+router = APIRouter(prefix="/projects", tags=["projects"])
+
 
 @router.get("/{project_id}/export/docx")
 def export_docx(project_id: int, db: Session = Depends(get_db), firebase_user: dict = Depends(get_current_user)):
