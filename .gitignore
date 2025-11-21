@@ -75,3 +75,4 @@ backend/serviceAccountKey.json
 frontend/.env
 backend/.env
 docker-compose.yml
+private-key.json

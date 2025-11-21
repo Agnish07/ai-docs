@@ -3,12 +3,13 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyCc73Xj_r4pXEh1u-XuUl5At4MYQanoRV0",
+  authDomain: "ocean-project-75d51.firebaseapp.com",
+  projectId: "ocean-project-75d51",
+  storageBucket: "ocean-project-75d51.firebasestorage.app",
+  messagingSenderId: "707110539756",
+  appId: "1:707110539756:web:04f20bb7786b408e99b0c9",
+  measurementId: "G-9VZ66C0K22"
 };
 
 const app = initializeApp(firebaseConfig);
