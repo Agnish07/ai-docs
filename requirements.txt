@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pydantic
+sqlalchemy
+asyncpg
+alembic  # if you use Alembic
+firebase-admin
+python-jose
+requests
+python-dotenv
+docx
+pptx
+os
+io
+sys
+pathlib

@@ -1,4 +1,4 @@
-// frontend/src/firebase.js
+// frontend/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
@@ -6,22 +6,28 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-
+// Debug helpers (safe for browser; won't break SSR or builds)
 if (typeof window !== "undefined") {
   try {
     window.auth = auth;
+
     window.getIdToken = async (forceRefresh = true) => {
-      if (!auth || !auth.currentUser) {
-        throw new Error("Not signed in (auth.currentUser is null). Log in first.");
+      if (!auth?.currentUser) {
+        throw new Error("User not signed in.");
       }
       return auth.currentUser.getIdToken(forceRefresh);
     };
   } catch (e) {
+    console.warn("Debug Firebase helpers failed to attach:", e);
   }
 }
+
+export default app;
