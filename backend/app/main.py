@@ -5,8 +5,8 @@ import base64
 from pathlib import Path
 from typing import List
 
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -15,7 +15,7 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-# import your routers
+# import routers
 from app.api import test_routes
 from app.api import projects
 from app.api import items
@@ -77,7 +77,7 @@ app.include_router(items.router)
 async def on_startup():
     # Print environment summary for easy debugging in Render logs
     print("=== startup: ENV SUMMARY ===", flush=True)
-    print("PYTHONPATH:", sys.path[:4], flush=True)
+    print("PYTHONPATH (top 4):", sys.path[:4], flush=True)
     print("FRONTEND_ORIGINS:", os.getenv("FRONTEND_ORIGINS"), flush=True)
     print("FIREBASE_SERVICE_ACCOUNT_B64 present:", bool(os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")), flush=True)
     print("=== registered routes ===", flush=True)
@@ -86,7 +86,7 @@ async def on_startup():
     try:
         routes_info: List[str] = []
         for r in app.routes:
-            methods = ",".join(sorted(r.methods)) if getattr(r, "methods", None) else "N/A"
+            methods = ",".join(sorted(getattr(r, "methods", []) or []))
             routes_info.append(f"{r.path}  [{methods}]")
         for line in sorted(routes_info):
             print(line, flush=True)
@@ -103,13 +103,25 @@ async def on_startup():
         print("DB init failed:", str(e), flush=True)
 
 
-# Root -> redirect to docs (not in openapi schema)
-@app.get("/", include_in_schema=False)
-def root():
+# Root: GET redirects to /docs. HEAD returns a 204 so proxies/health-checkers get success without redirect body.
+@app.get("/", include_in_schema=False, methods=["GET", "HEAD"])
+async def root_get(request: Request):
+    # If it's a HEAD request, return empty 204 (no body) to satisfy health checks quickly
+    if request.method == "HEAD":
+        return Response(status_code=204)
+    # For GET, redirect to docs
     return RedirectResponse(url="/docs")
 
 
-# simple health endpoint
-@app.get("/health", tags=["health"])
-def health():
-    return {"status": "ok"}
+# Simple health endpoint: support GET and HEAD explicitly
+@app.get("/health", tags=["health"], methods=["GET", "HEAD"])
+async def health(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=204)
+    return JSONResponse({"status": "ok"})
+
+
+# Optional: keep a JSON fallback for unknown root-like requests (not necessary, but useful)
+@app.get("/status", tags=["health"])
+def status():
+    return {"status": "ok", "service": "ai-docs"}
