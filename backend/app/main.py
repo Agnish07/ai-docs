@@ -3,6 +3,7 @@ import os
 import sys
 import base64
 from pathlib import Path
+from typing import List
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
@@ -14,16 +15,19 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
+# import your routers
 from app.api import test_routes
 from app.api import projects
 from app.api import items
 
 app = FastAPI(title="Ocean Project - AI Docs")
 
+# serve static if exists
 static_dir = BACKEND_ROOT / "static"
 if static_dir.exists() and static_dir.is_dir():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# CORS
 origins_env = os.getenv("FRONTEND_ORIGINS", "http://localhost:5173")
 ALLOW_ORIGINS = [o.strip() for o in origins_env.split(",") if o.strip()]
 if not ALLOW_ORIGINS:
@@ -37,6 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Firebase init (if provided as base64 env)
 firebase_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")
 if firebase_b64:
     try:
@@ -46,15 +51,23 @@ if firebase_b64:
         try:
             from app.core.firebase_admin import init_firebase
             init_firebase(str(sa_path))
-        except Exception:
-            import firebase_admin
-            from firebase_admin import credentials
-            cred = credentials.Certificate(str(sa_path))
-            if not firebase_admin._apps:
-                firebase_admin.initialize_app(cred)
+            print("Firebase initialized via app.core.firebase_admin.init_firebase", flush=True)
+        except Exception as e_inner:
+            # fallback to direct firebase_admin usage
+            try:
+                import firebase_admin
+                from firebase_admin import credentials
+                cred = credentials.Certificate(str(sa_path))
+                if not firebase_admin._apps:
+                    firebase_admin.initialize_app(cred)
+                print("Firebase initialized via firebase_admin.initialize_app", flush=True)
+            except Exception as e_fb:
+                print("Firebase fallback init failed:", str(e_fb), flush=True)
+                print("Original inner error:", str(e_inner), flush=True)
     except Exception as e:
         print("Firebase init failed:", str(e), flush=True)
 
+# register routers
 app.include_router(test_routes.router)
 app.include_router(projects.router)
 app.include_router(items.router)
@@ -62,19 +75,41 @@ app.include_router(items.router)
 
 @app.on_event("startup")
 async def on_startup():
+    # Print environment summary for easy debugging in Render logs
+    print("=== startup: ENV SUMMARY ===", flush=True)
+    print("PYTHONPATH:", sys.path[:4], flush=True)
+    print("FRONTEND_ORIGINS:", os.getenv("FRONTEND_ORIGINS"), flush=True)
+    print("FIREBASE_SERVICE_ACCOUNT_B64 present:", bool(os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")), flush=True)
+    print("=== registered routes ===", flush=True)
+
+    # print each registered route (path and methods)
+    try:
+        routes_info: List[str] = []
+        for r in app.routes:
+            methods = ",".join(sorted(r.methods)) if getattr(r, "methods", None) else "N/A"
+            routes_info.append(f"{r.path}  [{methods}]")
+        for line in sorted(routes_info):
+            print(line, flush=True)
+    except Exception as e:
+        print("Failed to list routes:", str(e), flush=True)
+
+    # DB init (safe)
     try:
         from app.db.session import engine, Base
         if hasattr(Base, "metadata") and engine is not None:
             Base.metadata.create_all(bind=engine)
+            print("DB metadata.create_all invoked", flush=True)
     except Exception as e:
         print("DB init failed:", str(e), flush=True)
 
 
+# Root -> redirect to docs (not in openapi schema)
 @app.get("/", include_in_schema=False)
 def root():
     return RedirectResponse(url="/docs")
 
 
-@app.get("/health")
+# simple health endpoint
+@app.get("/health", tags=["health"])
 def health():
     return {"status": "ok"}
