@@ -64,3 +64,4 @@ xlsxwriter==3.2.9
 # HTML parsing libs (pure-Python, safe for Render)
 beautifulsoup4==4.12.2
 html5lib==1.1
+markdown
