@@ -1,15 +1,11 @@
 # backend/app/core/firebase_admin.py
 """
-Robust Firebase admin initializer.
+Robust Firebase admin initializer + token verifier.
 
-This module exposes two helpers:
-- load_firebase_credentials() -> dict or raises RuntimeError
-- init_firebase(path_or_json)  -> initializes firebase_admin (no-op if already initialized)
-
-It will look for credentials in this order:
-1. FIREBASE_SERVICE_ACCOUNT_B64    (base64-encoded JSON string)
-2. FIREBASE_SERVICE_ACCOUNT        (raw JSON string)
-3. GOOGLE_APPLICATION_CREDENTIALS  (file path)
+Search order for credentials:
+1. FIREBASE_SERVICE_ACCOUNT_B64 (base64-encoded JSON)
+2. FIREBASE_SERVICE_ACCOUNT     (raw JSON string)
+3. GOOGLE_APPLICATION_CREDENTIALS (file path)
 """
 import os
 import json
@@ -23,12 +19,8 @@ GOOGLE_CREDS_PATH = "GOOGLE_APPLICATION_CREDENTIALS"
 
 
 def load_firebase_credentials() -> dict:
-    """
-    Return the service account credentials as a dict.
-    Prefer base64 env var, then raw JSON env var, then file path in GOOGLE_APPLICATION_CREDENTIALS.
-    Raise RuntimeError if none found or JSON invalid.
-    """
-    # 1) base64 encoded JSON in env (use this for Render / Vercel safely)
+    """Return service account credentials as a dict. Raise RuntimeError if not found/invalid."""
+    # 1) base64 encoded JSON in env
     b64 = os.getenv(FIREBASE_B64_NAME)
     if b64:
         try:
@@ -45,7 +37,7 @@ def load_firebase_credentials() -> dict:
         except Exception as e:
             raise RuntimeError(f"Invalid {FIREBASE_JSON_NAME} (JSON parse failed): {e}") from e
 
-    # 3) path to json file in GOOGLE_APPLICATION_CREDENTIALS
+    # 3) path to json file
     path = os.getenv(GOOGLE_CREDS_PATH)
     if path:
         p = Path(path)
@@ -64,26 +56,20 @@ def load_firebase_credentials() -> dict:
 
 
 def init_firebase_from_dict(sa_dict: dict):
-    """
-    Initialize firebase_admin using a credentials dict.
-    Safe to call multiple times (it checks firebase_admin._apps).
-    """
+    """Initialize firebase_admin from a service-account dict (idempotent)."""
     try:
         import firebase_admin
         from firebase_admin import credentials
     except Exception as e:
-        # if firebase_admin is not installed, bubble up
         raise RuntimeError(f"firebase_admin import failed: {e}") from e
 
-    if not firebase_admin._apps:
+    if not getattr(firebase_admin, "_apps", None):
         cred = credentials.Certificate(sa_dict)
         firebase_admin.initialize_app(cred)
 
 
 def init_firebase_from_path(path: str):
-    """
-    Initialize firebase_admin using a file path (string).
-    """
+    """Initialize firebase_admin from a file path (idempotent)."""
     try:
         import firebase_admin
         from firebase_admin import credentials
@@ -94,18 +80,17 @@ def init_firebase_from_path(path: str):
     if not p.exists():
         raise RuntimeError(f"Firebase service account file not found: {path}")
 
-    if not firebase_admin._apps:
+    if not getattr(firebase_admin, "_apps", None):
         cred = credentials.Certificate(str(p))
         firebase_admin.initialize_app(cred)
 
 
-# convenience wrapper used by other modules
 def init_firebase(default_path: Optional[str] = None):
     """
-    Attempt to load credentials and initialize firebase_admin.
-    If default_path is provided, it will try that path first.
+    Load credentials (using load_firebase_credentials) and initialize firebase_admin.
+    Safe to call multiple times.
     """
-    # if user supplied explicit file path, try it first
+    # try explicit path first
     if default_path:
         try:
             init_firebase_from_path(default_path)
@@ -113,10 +98,34 @@ def init_firebase(default_path: Optional[str] = None):
         except Exception:
             pass
 
-    sa = load_firebase_credentials()  # may raise RuntimeError
-    # If load returns a dict, initialize from dict
+    sa = load_firebase_credentials()
     if isinstance(sa, dict):
         init_firebase_from_dict(sa)
     else:
-        # Shouldn't happen but be defensive
         raise RuntimeError("Loaded firebase credentials are not a dict.")
+
+
+def verify_token(id_token: str) -> dict:
+    """
+    Verify an incoming Firebase ID token and return the decoded token (claims).
+    Raises RuntimeError on failure.
+    """
+    # Ensure firebase is initialized
+    try:
+        import firebase_admin
+        from firebase_admin import auth, credentials
+    except Exception as e:
+        raise RuntimeError(f"firebase_admin import failed: {e}") from e
+
+    # initialize app if not already
+    if not getattr(firebase_admin, "_apps", None):
+        # attempt to initialize using envs
+        sa = load_firebase_credentials()
+        init_firebase_from_dict(sa)  # will raise if invalid
+
+    try:
+        decoded = auth.verify_id_token(id_token)
+        return decoded
+    except Exception as e:
+        # firebase_admin.auth raises several exception types; normalize to RuntimeError
+        raise RuntimeError(f"Failed to verify Firebase ID token: {e}") from e
