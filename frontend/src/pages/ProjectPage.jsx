@@ -58,15 +58,39 @@ export default function ProjectPage() {
   }, [projectId]);
 
   function parseItemContentToStruct(item) {
-    if (!item) return null;
-    try {
-      const parsed = item.content ? JSON.parse(item.content) : null;
-      if (parsed && parsed.sections) return parsed;
-      return { sections: [{ heading: item.title || "", content_md: item.content || "" }] };
-    } catch (e) {
-      return { sections: [{ heading: item.title || "", content_md: item.content || "" }] };
-    }
+  if (!item || !item.content) {
+    return { sections: [{ heading: item?.title || "", content_md: "" }] };
   }
+
+  // Case 1 — Content is a JSON string
+  try {
+    const parsed = JSON.parse(item.content);
+
+    // If backend already returned the correct structured JSON
+    if (parsed.sections) {
+      return parsed;
+    }
+
+    // If backend returned {heading, content_md}
+    if (parsed.heading || parsed.content_md) {
+      return { sections: [parsed] };
+    }
+
+    // Fallback: convert JSON to single markdown block
+    return { sections: [{ heading: item.title || "", content_md: item.content }] };
+  } catch (e) {
+    // Case 2 — Content is NOT JSON (just raw text from backend)
+    return {
+      sections: [
+        {
+          heading: item.title || "",
+          content_md: item.content, // <-- SHOW RAW CONTENT
+        }
+      ]
+    };
+  }
+}
+
 
   function updateItemContentLocal(itemId, newContentString) {
     setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, content: newContentString } : it)));
@@ -96,16 +120,48 @@ export default function ProjectPage() {
       // If backend responds with parsed content, update local item content to reflect it immediately
       const data = resp.data || resp;
       if (data && data.parsed) {
-        const parsed = data.parsed;
-        // if parsed is a single section object, wrap sections
-        let sections = [];
-        if (parsed.sections) sections = parsed.sections;
-        else if (parsed.heading || parsed.content_md) sections = [{ heading: parsed.heading || "", content_md: parsed.content_md || "" }];
-        const newContentString = JSON.stringify({ title: project?.main_prompt || "", sections });
-        updateItemContentLocal(itemId, newContentString);
-        setSelectedItemId(itemId);
-        setSelectedItemStruct({ sections });
+
+  let sections = [];
+
+  // Full structured format
+  if (data.parsed.sections) {
+    sections = data.parsed.sections;
+
+  // Minimal format {heading, content_md}
+  } else if (data.parsed.heading || data.parsed.content_md) {
+    sections = [{ heading: data.parsed.heading || "", content_md: data.parsed.content_md || "" }];
+  }
+
+  // Raw text fallback
+  // fallback: backend returned ONLY generated_raw (plain text)
+else if (data.generated_raw) {
+  const rawText = data.generated_raw;
+
+  const newContentString = JSON.stringify({
+    sections: [
+      {
+        heading: selectedItem?.title || "",
+        content_md: rawText
       }
+    ]
+  });
+
+  updateItemContentLocal(itemId, newContentString);
+  setSelectedItemId(itemId);
+  setSelectedItemStruct({
+    sections: [
+      { heading: selectedItem?.title || "", content_md: rawText }
+    ]
+  });
+}
+
+
+  const newContentString = JSON.stringify({ sections });
+  updateItemContentLocal(itemId, newContentString);
+  setSelectedItemId(itemId);
+  setSelectedItemStruct({ sections });
+}
+
 
       // Always reload project list to pick up any server-side changes (IDs, content, etc)
       await loadProject();
