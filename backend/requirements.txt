@@ -64,3 +64,4 @@ xlsxwriter==3.2.9
 beautifulsoup4
 lxml
 html5lib
+bs4
