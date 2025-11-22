@@ -61,7 +61,7 @@ uvloop==0.22.1
 watchfiles==1.1.1
 websockets==15.0.1
 xlsxwriter==3.2.9
-beautifulsoup4
-lxml
-html5lib
-bs4
+# in backend/requirements.txt
+beautifulsoup4==4.12.2
+lxml==4.9.3
+html5lib==1.1
