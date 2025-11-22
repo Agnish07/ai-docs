@@ -2,11 +2,13 @@
 import axios from "axios";
 import { auth } from "./firebase";
 
+const envBase = import.meta.env.VITE_API_URL || "";
 const inferredBase =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== "undefined" && window.location.hostname === "localhost"
+  envBase.trim() !== ""
+    ? new URL("/api/v1", envBase).toString().replace(/\/$/, "")
+    : typeof window !== "undefined" && window.location.hostname === "localhost"
     ? "http://localhost:8000/api/v1"
-    : "/api/v1");
+    : "/api/v1";
 
 const api = axios.create({
   baseURL: inferredBase,
@@ -20,10 +22,24 @@ async function fetchIdToken() {
     if (typeof window !== "undefined" && typeof window.getIdToken === "function") {
       return await window.getIdToken();
     }
-  } catch (e) {
+    return new Promise((resolve) => {
+      if (!auth || typeof auth.onAuthStateChanged !== "function") return resolve(null);
+      const unsub = auth.onAuthStateChanged(async (u) => {
+        unsub();
+        if (u) {
+          try {
+            resolve(await u.getIdToken());
+          } catch {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  } catch {
     return null;
   }
-  return null;
 }
 
 api.interceptors.request.use(
@@ -34,7 +50,7 @@ api.interceptors.request.use(
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${token}`;
       }
-    } catch (err) {}
+    } catch {}
     return config;
   },
   (error) => Promise.reject(error)
