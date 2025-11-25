@@ -1,4 +1,3 @@
-# ocean-project
 # AI-Assisted Document Authoring & Generation Platform
 
 **Full-stack AI web app (FastAPI + React)**
