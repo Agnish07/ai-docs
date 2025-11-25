@@ -4,6 +4,9 @@
 
 This repository contains a full-stack application that allows authenticated users to generate, iteratively refine, and export structured business documents as **DOCX** or **PPTX** using an LLM. It was built to satisfy the assignment requirements for an AI-assisted document authoring platform.
 
+
+DISCLAIMER FOR THE HOSTED VERCEL APP - Please if the site show any issue just open the link wait for 60-100 seconds close the link and open the link a new tab and try again. This happens because my backed in hosted on render free version and I can't afford to pay for the paid version yet. So it automatically shuts down due to inactivity. It takes 60-100 seconds to restart the deployment. SO PLEASE CLOSE THE TAB AFTER A MINUTE OR 2 AND REOPEN THE LINK IN A NEW TAB. Thank you.
+
 ---
 
 ## Table of Contents
